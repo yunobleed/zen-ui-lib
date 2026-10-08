@@ -34,6 +34,11 @@ if not RubikFont then
     end)
 end
 
+local CodeFont = nil
+pcall(function()
+    CodeFont = Font.fromEnum(Enum.Font.Code)
+end)
+
 local Library = {
     Registry = {};
     RegistryMap = {};
@@ -49,8 +54,8 @@ local Library = {
 
     Black = Color3.new(0, 0, 0);
 
-    Font = Enum.Font.Ubuntu,
-    FontFace = RubikFont,
+    Font = Enum.Font.Code,
+    FontFace = CodeFont,
     FontSize = 14,
 
     OpenedFrames = {};
@@ -66,7 +71,7 @@ local Library = {
     ShowCustomCursor = true;
     LinoriaCursorRepo = 'https://raw.githubusercontent.com/xyznick/UELinoriaLib/main/';
     CursorActive = false;
-    UseBackgroundGradient = true;
+    UseBackgroundGradient = false;
     ToggleKeybind = 'RightShift';
 
     KeybindMode = 'All';
@@ -2509,10 +2514,10 @@ do
                 DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
             end
 
-            local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
-            Fill.Size = UDim2.new(0, X, 1, 0);
+            local ratio = math.clamp((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1);
+            Fill.Size = UDim2.new(ratio, 0, 1, 0);
 
-            HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
+            HideBorderRight.Visible = not (ratio >= 0.999 or ratio <= 0.001);
         end;
         function Slider:OnChanged(Func)
             Slider.Changed = Func;
@@ -2520,14 +2525,16 @@ do
         end;
         local function Round(Value)
             if Slider.Rounding == 0 then
-                return math.floor(Value);
+                return math.floor(Value + 0.5);
             end;
-
 
             return tonumber(string.format('%.' .. Slider.Rounding .. 'f', Value))
         end;
         function Slider:GetValueFromXOffset(X)
-            return Round(Library:MapValue(X, 0, Slider.MaxSize, Slider.Min, Slider.Max));
+            local width = SliderInner.AbsoluteSize.X;
+            if width <= 0 then width = 232; end;
+            local ratio = math.clamp(X / width, 0, 1);
+            return Round(Slider.Min + (ratio * (Slider.Max - Slider.Min)));
         end;
         function Slider:SetValue(Str)
             local Num = tonumber(Str);
@@ -2547,12 +2554,12 @@ do
                 DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
             end
 
-            local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
+            local ratio = math.clamp((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1);
             Library:Tween(Fill, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, X, 1, 0)
+                Size = UDim2.new(ratio, 0, 1, 0)
             });
 
-            HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
+            HideBorderRight.Visible = not (ratio >= 0.999 or ratio <= 0.001);
 
             Library:SafeCallback(Slider.Callback, Slider.Value);
             Library:SafeCallback(Slider.Changed, Slider.Value);
@@ -2561,12 +2568,15 @@ do
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
                 
                 local function UpdateSlider(PosX)
-                    local gPos = Fill.AbsolutePosition.X
-                    
-                    local Diff = PosX - gPos
-                    local nX = math.clamp(Diff, 0, Slider.MaxSize)
+                    local gPos = SliderInner.AbsolutePosition.X;
+                    local width = SliderInner.AbsoluteSize.X;
+                    if width <= 0 then width = 232; end;
 
-                    local nValue = Slider:GetValueFromXOffset(nX);
+                    local Diff = PosX - gPos;
+                    local ratio = math.clamp(Diff / width, 0, 1);
+
+                    local rawVal = Slider.Min + (ratio * (Slider.Max - Slider.Min));
+                    local nValue = Round(rawVal);
                     local OldValue = Slider.Value;
     
                     Slider.Value = nValue;
@@ -3535,14 +3545,14 @@ function Library:CreateWindow(...)
     Library:MakeDraggable(Outer, 25, true);
 
     local WindowScale = Library:Create('UIScale', {
-        Scale = 1,
+        Scale = Library.Scale or 1,
         Parent = Outer,
     });
 
     local Inner = Library:Create('Frame', {
         Name = "Inner",
         BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.OutlineColor;
+        BorderColor3 = Color3.new(0, 0, 0);
         BorderMode = Enum.BorderMode.Inset;
         Position = UDim2.new(0, 1, 0, 1);
         Size = UDim2.new(1, -2, 1, -2);
@@ -3551,23 +3561,23 @@ function Library:CreateWindow(...)
     });
     Library:AddToRegistry(Inner, {
         BackgroundColor3 = 'MainColor';
-        BorderColor3 = 'OutlineColor';
+        BorderColor3 = 'Black';
     });
 
     local InnerGradient = Library:Create('UIGradient', {
         Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.15)),
-            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.72)),
+            ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.05)),
+            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.95)),
         }),
         Rotation = 90,
-        Enabled = Config.BackgroundGradient ~= false and Library.UseBackgroundGradient ~= false,
+        Enabled = Config.BackgroundGradient == true and Library.UseBackgroundGradient == true,
         Parent = Inner,
     });
     Library:AddToRegistry(InnerGradient, {
         Color = function()
             return ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.15)),
-                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.72)),
+                ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.05)),
+                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.95)),
             });
         end
     });
@@ -3788,6 +3798,15 @@ function Library:CreateWindow(...)
         end
         Window:SetBackgroundGradient(Enabled, Color1, Color2, Rotation)
     end;
+
+    function Window:SetScale(Scale)
+        Library.Scale = tonumber(Scale) or 1;
+        WindowScale.Scale = Library.Scale;
+    end;
+
+    function Library:SetScale(Scale)
+        Window:SetScale(Scale);
+    end;
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.OutlineColor;
@@ -3802,23 +3821,6 @@ function Library:CreateWindow(...)
         BorderColor3 = 'OutlineColor';
     });
     Outer.ClipsDescendants = true;
-    local CornerCircle = Library:Create('Frame', {
-        AnchorPoint      = Vector2.new(0.5, 0.5);
-        BackgroundColor3 = Library.AccentColor;
-        BackgroundTransparency = 0.5;
-        BorderSizePixel  = 0;
-        Position         = UDim2.new(1, 0, 1, 0);
-        Size             = UDim2.fromOffset(46, 46);
-        ZIndex           = 10;
-        Parent           = Inner;
-    });
-    Library:Create('UICorner', {
-        CornerRadius = UDim.new(1, 0);
-        Parent       = CornerCircle;
-    });
-    Library:AddToRegistry(CornerCircle, {
-        BackgroundColor3 = 'AccentColor';
-    });
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
     end;
@@ -4515,7 +4517,7 @@ function Library:CreateWindow(...)
         local FadeTime = Config.MenuFadeTime or 0.22;
         if Library.Toggled then
             Outer.Visible = true;
-            WindowScale.Scale = 1;
+            WindowScale.Scale = Library.Scale or 1;
             if Outer:IsA("CanvasGroup") then
                 Outer.GroupTransparency = 1;
                 Library:Tween(Outer, TweenInfo.new(FadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -4641,148 +4643,153 @@ end;
 Players.PlayerAdded:Connect(OnPlayerChange);
 Players.PlayerRemoving:Connect(OnPlayerChange);
 
-if InputService.TouchEnabled then
-    local MobileGui = Instance.new("ScreenGui")
+local MobileGui = CoreGui:FindFirstChild("LinoriaMobileUI")
+if not MobileGui then
+    MobileGui = Instance.new("ScreenGui")
     MobileGui.Name = "LinoriaMobileUI"
     MobileGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     ProtectGui(MobileGui)
     MobileGui.Parent = CoreGui
+end
 
-    local BTN_W, BTN_H = 88, 30
-    local BTN_GAP      = 40  
+local BTN_W, BTN_H = 88, 30
+local BTN_GAP      = 40  
 
-    local function CreateMobileButton(name, text, startPos)
-        local Outer = Library:Create('Frame', {
-            Name             = name .. "Outer",
-            BackgroundColor3 = Library.OutlineColor,
-            BorderSizePixel  = 0,
-            Position         = startPos,
-            Size             = UDim2.new(0, BTN_W, 0, BTN_H),
-            ZIndex           = 300,
-            Parent           = MobileGui,
-            Active           = true,
-        })
-        Library:AddToRegistry(Outer, { BackgroundColor3 = 'OutlineColor' })
+local function CreateMobileButton(name, text, startPos)
+    local Outer = Library:Create('Frame', {
+        Name             = name .. "Outer",
+        BackgroundColor3 = Library.OutlineColor,
+        BorderSizePixel  = 0,
+        Position         = startPos,
+        Size             = UDim2.new(0, BTN_W, 0, BTN_H),
+        ZIndex           = 300,
+        Parent           = MobileGui,
+        Active           = true,
+    })
+    Library:AddToRegistry(Outer, { BackgroundColor3 = 'OutlineColor' })
 
-        local AccentFrame = Library:Create('Frame', {
-            Name             = name .. "Accent",
-            BackgroundColor3 = Library.AccentColor,
-            BorderSizePixel  = 0,
-            Position         = UDim2.new(0, 1, 0, 1),
-            Size             = UDim2.new(1, -2, 1, -2),
-            ZIndex           = 301,
-            Parent           = Outer,
-        })
-        Library:AddToRegistry(AccentFrame, { BackgroundColor3 = 'AccentColor' })
+    local AccentFrame = Library:Create('Frame', {
+        Name             = name .. "Accent",
+        BackgroundColor3 = Library.AccentColor,
+        BorderSizePixel  = 0,
+        Position         = UDim2.new(0, 1, 0, 1),
+        Size             = UDim2.new(1, -2, 1, -2),
+        ZIndex           = 301,
+        Parent           = Outer,
+    })
+    Library:AddToRegistry(AccentFrame, { BackgroundColor3 = 'AccentColor' })
 
-        local Inner = Library:Create('Frame', {
-            Name             = name .. "Inner",
-            BackgroundColor3 = Color3.fromRGB(8, 8, 12),
-            BorderSizePixel  = 0,
-            Position         = UDim2.new(0, 1, 0, 1),
-            Size             = UDim2.new(1, -2, 1, -2),
-            ZIndex           = 302,
-            Parent           = AccentFrame,
-        })
+    local Inner = Library:Create('Frame', {
+        Name             = name .. "Inner",
+        BackgroundColor3 = Color3.fromRGB(8, 8, 12),
+        BorderSizePixel  = 0,
+        Position         = UDim2.new(0, 1, 0, 1),
+        Size             = UDim2.new(1, -2, 1, -2),
+        ZIndex           = 302,
+        Parent           = AccentFrame,
+    })
 
-        local GradientOverlay = Library:Create('Frame', {
-            Name             = name .. "Gradient",
-            BackgroundColor3 = Color3.new(1, 1, 1), 
-            BorderSizePixel  = 0,
-            Size             = UDim2.new(1, 0, 1, 0),
-            ZIndex           = 303,
-            Parent           = Inner,
-        })
-        Library:Create('UIGradient', {
-            Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.90), 
-                NumberSequenceKeypoint.new(1, 1.0)   
-            }),
-            Rotation = 90,
-            Parent = GradientOverlay,
-        })
+    local GradientOverlay = Library:Create('Frame', {
+        Name             = name .. "Gradient",
+        BackgroundColor3 = Color3.new(1, 1, 1), 
+        BorderSizePixel  = 0,
+        Size             = UDim2.new(1, 0, 1, 0),
+        ZIndex           = 303,
+        Parent           = Inner,
+    })
+    Library:Create('UIGradient', {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.90), 
+            NumberSequenceKeypoint.new(1, 1.0)   
+        }),
+        Rotation = 90,
+        Parent = GradientOverlay,
+    })
 
-        local Btn = Library:Create('TextButton', {
-            Name                = name .. "Btn",
-            BackgroundTransparency = 1,
-            Size                = UDim2.new(1, 0, 1, 0),
-            Font                = Enum.Font.Code,
-            Text                = text,
-            TextColor3          = Color3.fromRGB(255, 255, 255),
-            TextSize            = Library.FontSize - 1,
-            ZIndex              = 304,
-            Parent              = Inner,
-            Active              = true,
-        })
+    local Btn = Library:Create('TextButton', {
+        Name                = name .. "Btn",
+        BackgroundTransparency = 1,
+        Size                = UDim2.new(1, 0, 1, 0),
+        Font                = Enum.Font.Code,
+        Text                = text,
+        TextColor3          = Color3.fromRGB(255, 255, 255),
+        TextSize            = Library.FontSize - 1,
+        ZIndex              = 304,
+        Parent              = Inner,
+        Active              = true,
+    })
 
-        return Outer, Btn
-    end
+    return Outer, Btn
+end
 
-    local ToggleOuter, ToggleBtn = CreateMobileButton("Toggle", "Toggle UI",  UDim2.new(0, 10, 0, 10))
-    local LockOuter,   LockBtn  = CreateMobileButton("Lock",   "Unlock UI",  UDim2.new(0, 10, 0, 10 + BTN_H + (BTN_GAP - BTN_H)))
+local ToggleOuter, ToggleBtn = CreateMobileButton("Toggle", "Toggle UI",  UDim2.new(0, 10, 0, 10))
+local LockOuter,   LockBtn  = CreateMobileButton("Lock",   "Unlock UI",  UDim2.new(0, 10, 0, 10 + BTN_H + (BTN_GAP - BTN_H)))
 
-    local IsUnlocked = false
+local IsUnlocked = false
 
-    local function BindMobileButtonAction(Btn, Outer, ClickAction)
-        local dragging  = false
-        local dragInput = nil
-        local dragStart = nil
-        local startPos  = nil
-        local hasMoved  = false
+local function BindMobileButtonAction(Btn, Outer, ClickAction)
+    local dragging  = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos  = nil
+    local hasMoved  = false
 
-        Btn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-                dragging  = true
-                hasMoved  = false
-                dragStart = input.Position
-                startPos  = Outer.Position
-                dragInput = input
+    Btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            hasMoved  = false
+            dragStart = input.Position
+            startPos  = Outer.Position
+            dragInput = input
 
-                local connection
-                connection = input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                        connection:Disconnect()
-                        if not hasMoved then
-                            ClickAction()
-                        end
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    connection:Disconnect()
+                    if not hasMoved then
+                        ClickAction()
                     end
-                end)
-            end
-        end)
-
-        InputService.InputChanged:Connect(function(input)
-            if input == dragInput and dragging then
-                local delta = input.Position - dragStart
-                if delta.Magnitude > 3 then
-                    hasMoved = true
                 end
-                if IsUnlocked and hasMoved then
-                    Outer.Position = UDim2.new(
-                        startPos.X.Scale, startPos.X.Offset + delta.X,
-                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                    )
-                end
-            end
-        end)
-    end
-
-    BindMobileButtonAction(ToggleBtn, ToggleOuter, function()
-        Library:Toggle()
+            end)
+        end
     end)
 
-    BindMobileButtonAction(LockBtn, LockOuter, function()
-        IsUnlocked = not IsUnlocked
-        LockBtn.Text = IsUnlocked and "Lock UI" or "Unlock UI"
-        LockBtn.TextColor3 = IsUnlocked
-            and Library.AccentColor
-            or  Color3.fromRGB(255, 255, 255)
+    InputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            if delta.Magnitude > 3 then
+                hasMoved = true
+            end
+            if IsUnlocked and hasMoved then
+                Outer.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end
     end)
+end
 
-    local _origUpdate = Library.UpdateColorsUsingRegistry
-    Library.UpdateColorsUsingRegistry = function(self)
-        _origUpdate(self)
+BindMobileButtonAction(ToggleBtn, ToggleOuter, function()
+    Library:Toggle()
+end)
+
+BindMobileButtonAction(LockBtn, LockOuter, function()
+    IsUnlocked = not IsUnlocked
+    LockBtn.Text = IsUnlocked and "Lock UI" or "Unlock UI"
+    LockBtn.TextColor3 = IsUnlocked
+        and Library.AccentColor
+        or  Color3.fromRGB(255, 255, 255)
+end)
+
+MobileGui.Enabled = InputService.TouchEnabled or false
+
+function Library:SetMobileButton(Enabled)
+    Library.ShowMobileButton = Enabled
+    if MobileGui then
+        MobileGui.Enabled = Enabled
     end
 end
 
