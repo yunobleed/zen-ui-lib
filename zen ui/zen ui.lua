@@ -3501,7 +3501,14 @@ function Library:CreateWindow(...)
         Tabs = {};
     };
 
-    local Outer = Library:Create('Frame', {
+    local OuterClass = 'CanvasGroup';
+    local hasCg = pcall(function()
+        local test = Instance.new('CanvasGroup');
+        test:Destroy();
+    end);
+    if not hasCg then OuterClass = 'Frame'; end;
+
+    local Outer = Library:Create(OuterClass, {
         AnchorPoint = Config.AnchorPoint,
         BackgroundColor3 = Color3.new(0, 0, 0);
         BorderSizePixel = 0;
@@ -3511,6 +3518,9 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = ScreenGui;
     });
+    if Outer:IsA("CanvasGroup") then
+        Outer.GroupTransparency = 1;
+    end
     Library:MakeDraggable(Outer, 25, true);
 
     local WindowScale = Library:Create('UIScale', {
@@ -4429,26 +4439,91 @@ function Library:CreateWindow(...)
         Modal = false;
         Parent = ScreenGui;
     });
+
+    local CustomCursorAssetId = nil;
+    local function GetCursorAsset()
+        if CustomCursorAssetId then
+            return CustomCursorAssetId;
+        end;
+
+        local folder = "zen";
+        local localFile = "zen/cursor.png";
+        if makefolder and isfolder and not isfolder(folder) then
+            pcall(makefolder, folder);
+        end;
+
+        -- 1. Try to fetch from user's GitHub repository
+        local urls = {
+            "https://raw.githubusercontent.com/yunobleed/zen-ui-lib/main/cursor.png",
+            "https://raw.githubusercontent.com/yunobleed/zen-ui-lib/main/cursor.svg",
+        };
+        for _, url in ipairs(urls) do
+            local ok, data = pcall(game.HttpGet, game, url);
+            if ok and data and #data > 100 and not data:find("404: Not Found") then
+                if writefile then pcall(writefile, localFile, data); end;
+                break;
+            end;
+        end;
+
+        -- 2. If file does not exist locally yet, write embedded high-res PNG
+        if isfile and not isfile(localFile) and writefile then
+            local b64 = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACzklEQVR42u2aS0scQRSFKzEZZze7LJKQIZEgiogQd/kbARHEQRBEEBpBEFfzD/IrBEHEQUQEkUwIIdtZZR3wgQ98xY0bk8654VbodGboR6q7q6vqwMdsZtHn0Ge6+t4RwumPHoMRpmqj+ffgO7gFX8AKGLMljBE274egMD6DZTAK+k0O4LZLAEEooE9gib9fMSmAKt/2fkxuwEewCIZNCWMlQQBBrsEH4IEh/j0ppcbCNajX679JEMYV2AcLYLBsYVT5B++vAEidTsf3PC9pGJdgD8yD1+BRGUJYDhsh80GlCOMnuAC7YA4M6BzGaPhxSGZ7KWUY52AHzIJXoE+nAPr5UfdPDaKUMowzsA1mwEtdwliKqkFGYZyCLTAN6uBhkYeim7g1yCCMH+AEbIIp8CLvMCp8yElcg4zCOAYbYBI8zyuMxf+tQZTa7bbfaDT8Wq2WJIwjsA4mwDPwIKsAhvmEp6QGUWq1WmnCOARr4B14qjqMCh9vldcggzDuwQFYBW9UhuBlXYMMwvgKnqgKYIjP9rnUQFEYd2Bc5ZRov4gaRKnZbOZyBwh+qyu0Bt0epT3ugm/greqnwSC/1WlRg7zNyxrs6VCDIsxLzfNZvbAaFGle8DDjoqgaFG1e8PBit4ga6GBeai7vGuhkXvAY6zyvGuhmXtZgJ48a6GheajZcA3qltcW84AHmWfDC6Gxui3nBA8vt4MXRBdtiXmomXAN6S7PFvODR9amqGpTNvKzBlooalNG81DTP5FLXoMzmBS8tTtLWoOzmBc/lN9PUwATzUlNJa2CSecHrquO4NTDNvKzBRpwamGheajKqBiabF7yoPOpVA9PNyxqsd6uBDealJsI1oKWFLeZJtKI+jLGzM9I8iVbSa7aal6L9/L2t5kn054QDW83LGqzaal6K/plBq+k7/rTKvBTt5ceF4v28k5OTk5OTk5OTk1Mm+gV9FYp4RwHALQAAAABJRU5ErkJggg==";
+            local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            local s = b64:gsub('[^'..b..'=]', '');
+            local raw = (s:gsub('.', function(x)
+                if (x == '=') then return '' end;
+                local r, f = '', (b:find(x) - 1);
+                for i = 6, 1, -1 do r = r .. (f % 2^i - f % 2^(i - 1) > 0 and '1' or '0') end;
+                return r;
+            end):gsub('%d%d%d%d%d%d%d%d', function(x)
+                local c = 0;
+                for i = 1, 8 do c = c + (x:sub(i, i) == '1' and 2^(8 - i) or 0) end;
+                return string.char(c);
+            end));
+            pcall(writefile, localFile, raw);
+        end;
+
+        -- 3. Load via getcustomasset or getsynasset
+        if isfile and isfile(localFile) and (getcustomasset or getsynasset) then
+            local fn = getcustomasset or getsynasset;
+            local okAsset, asset = pcall(fn, localFile);
+            if okAsset and asset then
+                CustomCursorAssetId = asset;
+                return CustomCursorAssetId;
+            end;
+        end;
+
+        CustomCursorAssetId = "rbxasset://textures/Cursors/KeyboardMouse/ArrowFarCursor.png";
+        return CustomCursorAssetId;
+    end;
+
     function Library:Toggle()
         Library.Toggled = not Library.Toggled;
         ModalElement.Modal = Library.Toggled;
 
-        local FadeTime = Config.MenuFadeTime or 0.2;
+        local FadeTime = Config.MenuFadeTime or 0.22;
         if Library.Toggled then
             Outer.Visible = true;
-            WindowScale.Scale = 0.95;
-            Library:Tween(WindowScale, TweenInfo.new(FadeTime, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Scale = 1
-            });
+            WindowScale.Scale = 1;
+            if Outer:IsA("CanvasGroup") then
+                Outer.GroupTransparency = 1;
+                Library:Tween(Outer, TweenInfo.new(FadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    GroupTransparency = 0
+                });
+            end
         else
-            Library:Tween(WindowScale, TweenInfo.new(FadeTime * 0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Scale = 0.95
-            });
-            task.delay(FadeTime * 0.75, function()
-                if not Library.Toggled then
-                    Outer.Visible = false;
-                end;
-            end);
+            if Outer:IsA("CanvasGroup") then
+                Library:Tween(Outer, TweenInfo.new(FadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    GroupTransparency = 1
+                });
+                task.delay(FadeTime, function()
+                    if not Library.Toggled then
+                        Outer.Visible = false;
+                    end;
+                end);
+            else
+                Outer.Visible = false;
+            end
         end;
 
         local ShowCursor = (Config.ShowCustomCursor ~= false) and (Library.ShowCustomCursor ~= false);
@@ -4458,78 +4533,37 @@ function Library:CreateWindow(...)
                 task.spawn(function()
                     local State = InputService.MouseIconEnabled;
 
-                    -- Authentic Linoria Drawing Triangle Cursor
-                    local Cursor, CursorOutline;
-                    local HasDrawing = false;
-                    pcall(function()
-                        if typeof(Drawing) == 'table' and Drawing.new then
-                            Cursor = Drawing.new('Triangle');
-                            Cursor.Thickness = 1;
-                            Cursor.Filled = true;
-                            Cursor.Visible = true;
-
-                            CursorOutline = Drawing.new('Triangle');
-                            CursorOutline.Thickness = 1;
-                            CursorOutline.Filled = false;
-                            CursorOutline.Color = Color3.new(0, 0, 0);
-                            CursorOutline.Visible = true;
-
-                            -- Safe ZIndex assignment if supported
-                            pcall(function() Cursor.ZIndex = 999999 end);
-                            pcall(function() CursorOutline.ZIndex = 1000000 end);
-
-                            HasDrawing = true;
-                        end;
-                    end);
-
-                    local GuiCursor;
-                    if not HasDrawing or not Cursor or not CursorOutline then
-                        GuiCursor = ScreenGui:FindFirstChild("LinoriaCustomCursor");
-                        if not GuiCursor then
-                            GuiCursor = Library:Create('ImageLabel', {
-                                Name = "LinoriaCustomCursor",
-                                BackgroundTransparency = 1,
-                                Size = UDim2.fromOffset(20, 20),
-                                Image = "rbxasset://textures/Cursors/KeyboardMouse/ArrowFarCursor.png",
-                                ImageColor3 = Library.AccentColor,
-                                ZIndex = 1000000,
-                                Visible = false,
-                                Parent = ScreenGui,
-                            });
-                        end;
-                        GuiCursor.Visible = true;
+                    local CursorAsset = GetCursorAsset();
+                    local GuiCursor = ScreenGui:FindFirstChild("ZenCustomCursor");
+                    if not GuiCursor then
+                        GuiCursor = Library:Create('ImageLabel', {
+                            Name = "ZenCustomCursor",
+                            BackgroundTransparency = 1,
+                            Size = UDim2.fromOffset(24, 24),
+                            Image = CursorAsset,
+                            ImageColor3 = Library.AccentColor,
+                            ZIndex = 1000000,
+                            Visible = false,
+                            Parent = ScreenGui,
+                        });
+                    else
+                        GuiCursor.Image = CursorAsset;
                     end;
+                    GuiCursor.Visible = true;
 
                     while Library.Toggled and ScreenGui.Parent do
                         InputService.MouseIconEnabled = false;
 
                         local mPos = InputService:GetMouseLocation();
+                        local guiInset = GuiService:GetGuiInset();
 
-                        if HasDrawing and Cursor and CursorOutline then
-                            Cursor.Color = Library.AccentColor;
-                            Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
-                            Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
-                            Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
-                            CursorOutline.PointA = Cursor.PointA;
-                            CursorOutline.PointB = Cursor.PointB;
-                            CursorOutline.PointC = Cursor.PointC;
-                        elseif GuiCursor then
-                            local guiInset = GuiService:GetGuiInset();
-                            GuiCursor.ImageColor3 = Library.AccentColor;
-                            GuiCursor.Position = UDim2.fromOffset(mPos.X - guiInset.X, mPos.Y - guiInset.Y);
-                        end;
+                        GuiCursor.ImageColor3 = Library.AccentColor;
+                        GuiCursor.Position = UDim2.fromOffset(mPos.X - guiInset.X, mPos.Y - guiInset.Y);
 
                         RenderStepped:Wait();
                     end;
 
                     InputService.MouseIconEnabled = (State ~= nil and State) or true;
-
-                    if HasDrawing and Cursor and CursorOutline then
-                        pcall(function()
-                            Cursor:Remove();
-                            CursorOutline:Remove();
-                        end);
-                    end;
                     if GuiCursor then
                         GuiCursor.Visible = false;
                     end;
