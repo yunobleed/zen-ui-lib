@@ -1,5 +1,6 @@
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
+local GuiService = game:GetService('GuiService');
 local CoreGui = game:GetService('CoreGui');
 local Teams = game:GetService('Teams');
 local Players = game:GetService('Players');
@@ -63,6 +64,8 @@ local Library = {
     UseBlur = false;
     BlurSize = 15;
     ShowCustomCursor = true;
+    LinoriaCursorRepo = 'https://raw.githubusercontent.com/xyznick/UELinoriaLib/main/';
+    CursorActive = false;
     UseBackgroundGradient = true;
     ToggleKeybind = 'RightShift';
 
@@ -178,6 +181,18 @@ function Library:SetFont(NewFont)
                 end
             end
         end
+    end
+end
+
+function Library:InitLinoriaCursor(repoUrl)
+    Library.LinoriaCursorRepo = repoUrl or Library.LinoriaCursorRepo or 'https://raw.githubusercontent.com/xyznick/UELinoriaLib/main/';
+    Library.ShowCustomCursor = true;
+end
+
+function Library:SetCustomCursor(enabled)
+    Library.ShowCustomCursor = (enabled == true);
+    if not enabled then
+        InputService.MouseIconEnabled = true;
     end
 end
 
@@ -4438,76 +4453,89 @@ function Library:CreateWindow(...)
 
         local ShowCursor = (Config.ShowCustomCursor ~= false) and (Library.ShowCustomCursor ~= false);
         if Library.Toggled and ShowCursor then
-            task.spawn(function()
-                local State = InputService.MouseIconEnabled;
+            if not Library.CursorActive then
+                Library.CursorActive = true;
+                task.spawn(function()
+                    local State = InputService.MouseIconEnabled;
 
-                local Cursor, CursorOutline;
-                local HasDrawing = pcall(function()
-                    Cursor = Drawing.new('Triangle');
-                    Cursor.Thickness = 1;
-                    Cursor.Filled = true;
-                    Cursor.Visible = true;
-                    Cursor.ZIndex = 999999;
+                    -- Authentic Linoria Drawing Triangle Cursor
+                    local Cursor, CursorOutline;
+                    local HasDrawing = false;
+                    pcall(function()
+                        if typeof(Drawing) == 'table' and Drawing.new then
+                            Cursor = Drawing.new('Triangle');
+                            Cursor.Thickness = 1;
+                            Cursor.Filled = true;
+                            Cursor.Visible = true;
 
-                    CursorOutline = Drawing.new('Triangle');
-                    CursorOutline.Thickness = 1;
-                    CursorOutline.Filled = false;
-                    CursorOutline.Color = Color3.new(0, 0, 0);
-                    CursorOutline.Visible = true;
-                    CursorOutline.ZIndex = 1000000;
-                end);
+                            CursorOutline = Drawing.new('Triangle');
+                            CursorOutline.Thickness = 1;
+                            CursorOutline.Filled = false;
+                            CursorOutline.Color = Color3.new(0, 0, 0);
+                            CursorOutline.Visible = true;
 
-                local GuiCursor;
-                if not HasDrawing or not Cursor then
-                    GuiCursor = ScreenGui:FindFirstChild("LinoriaCustomCursor");
-                    if not GuiCursor then
-                        GuiCursor = Library:Create('ImageLabel', {
-                            Name = "LinoriaCustomCursor",
-                            BackgroundTransparency = 1,
-                            Size = UDim2.fromOffset(24, 24),
-                            Image = "rbxassetid://10639918520",
-                            ImageColor3 = Library.AccentColor,
-                            ZIndex = 1000000,
-                            Visible = false,
-                            Parent = ScreenGui,
-                        });
+                            -- Safe ZIndex assignment if supported
+                            pcall(function() Cursor.ZIndex = 999999 end);
+                            pcall(function() CursorOutline.ZIndex = 1000000 end);
+
+                            HasDrawing = true;
+                        end;
+                    end);
+
+                    local GuiCursor;
+                    if not HasDrawing or not Cursor or not CursorOutline then
+                        GuiCursor = ScreenGui:FindFirstChild("LinoriaCustomCursor");
+                        if not GuiCursor then
+                            GuiCursor = Library:Create('ImageLabel', {
+                                Name = "LinoriaCustomCursor",
+                                BackgroundTransparency = 1,
+                                Size = UDim2.fromOffset(20, 20),
+                                Image = "rbxasset://textures/Cursors/KeyboardMouse/ArrowFarCursor.png",
+                                ImageColor3 = Library.AccentColor,
+                                ZIndex = 1000000,
+                                Visible = false,
+                                Parent = ScreenGui,
+                            });
+                        end;
+                        GuiCursor.Visible = true;
                     end;
-                    GuiCursor.Visible = true;
-                end;
 
-                while Library.Toggled and ScreenGui.Parent do
-                    InputService.MouseIconEnabled = false;
+                    while Library.Toggled and ScreenGui.Parent do
+                        InputService.MouseIconEnabled = false;
 
-                    local mPos = InputService:GetMouseLocation();
+                        local mPos = InputService:GetMouseLocation();
+
+                        if HasDrawing and Cursor and CursorOutline then
+                            Cursor.Color = Library.AccentColor;
+                            Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
+                            Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
+                            Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
+                            CursorOutline.PointA = Cursor.PointA;
+                            CursorOutline.PointB = Cursor.PointB;
+                            CursorOutline.PointC = Cursor.PointC;
+                        elseif GuiCursor then
+                            local guiInset = GuiService:GetGuiInset();
+                            GuiCursor.ImageColor3 = Library.AccentColor;
+                            GuiCursor.Position = UDim2.fromOffset(mPos.X - guiInset.X, mPos.Y - guiInset.Y);
+                        end;
+
+                        RenderStepped:Wait();
+                    end;
+
+                    InputService.MouseIconEnabled = (State ~= nil and State) or true;
 
                     if HasDrawing and Cursor and CursorOutline then
-                        Cursor.Color = Library.AccentColor;
-                        Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
-                        Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
-                        Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
-                        CursorOutline.PointA = Cursor.PointA;
-                        CursorOutline.PointB = Cursor.PointB;
-                        CursorOutline.PointC = Cursor.PointC;
-                    elseif GuiCursor then
-                        GuiCursor.ImageColor3 = Library.AccentColor;
-                        GuiCursor.Position = UDim2.fromOffset(mPos.X, mPos.Y);
+                        pcall(function()
+                            Cursor:Remove();
+                            CursorOutline:Remove();
+                        end);
                     end;
-
-                    RenderStepped:Wait();
-                end;
-
-                InputService.MouseIconEnabled = State;
-
-                if HasDrawing and Cursor and CursorOutline then
-                    pcall(function()
-                        Cursor:Remove();
-                        CursorOutline:Remove();
-                    end);
-                end;
-                if GuiCursor then
-                    GuiCursor.Visible = false;
-                end;
-            end);
+                    if GuiCursor then
+                        GuiCursor.Visible = false;
+                    end;
+                    Library.CursorActive = false;
+                end);
+            end;
         end;
 
         if Library.UseBlur then
