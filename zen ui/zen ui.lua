@@ -1428,6 +1428,75 @@ do
             Parent = KeybindEntry,
         }, true)
 
+        function KeyPicker:GetState()
+            if KeyPicker.Mode == 'Always' then
+                return true;
+            elseif KeyPicker.Mode == 'Hold' then
+                if KeyPicker.Value == 'None' then
+                    return false;
+                end;
+
+                local Key = KeyPicker.Value;
+                if Key == 'MB1' or Key == 'MB2' or Key == 'Touch' then
+                    return (Key == 'MB1' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1))
+                        or (Key == 'MB2' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
+                        or (Key == 'Touch' and KeyPicker.Toggled);
+                else
+                    local success, isDown = pcall(function()
+                        return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]);
+                    end);
+                    return (success and isDown) or KeyPicker.Toggled or false;
+                end;
+            else
+                return KeyPicker.Toggled;
+            end;
+        end;
+
+        function KeyPicker:Update()
+            if Info.NoUI then
+                return;
+            end;
+
+            local State = KeyPicker:GetState();
+
+            local displayKey = (KeyPicker.Value == 'None') and '...' or KeyPicker.Value
+            ContainerLabel.Text = string.format('[%s] %s (%s)', displayKey, Info.Text or 'Keybind', KeyPicker.Mode or 'Toggle');
+            local kbMode = Library.KeybindMode or 'All'
+            if kbMode == 'Active' then
+                KeybindEntry.Visible = State == true
+            elseif kbMode == 'Toggled' then
+                local parentOn = false
+                if ParentObj and ParentObj.Type == 'Toggle' then
+                    parentOn = ParentObj.Value == true
+                elseif KeyPicker.SyncToggleState and ParentObj then
+                    parentOn = ParentObj.Value == true
+                else
+                    parentOn = true
+                end
+                KeybindEntry.Visible = parentOn
+            else
+                KeybindEntry.Visible = true
+            end
+
+            ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
+            Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
+
+            local YSize = 0
+            local XSize = 0
+
+            for _, Frame in next, Library.KeybindContainer:GetChildren() do
+                if Frame:IsA('Frame') and Frame.Visible then
+                    YSize = YSize + 18;
+                    local LabelChild = Frame:FindFirstChildOfClass('TextLabel')
+                    if LabelChild and (LabelChild.TextBounds.X + 20 > XSize) then
+                        XSize = LabelChild.TextBounds.X + 20 
+                    end
+                end;
+            end;
+
+            Library.KeybindFrame.Size = UDim2.new(0, math.max(XSize + 10 + 15, 210), 0, YSize + 23)
+        end;
+
         local ModeButtons = {};
 
         for Idx, Mode in next, Modes do
@@ -1480,74 +1549,6 @@ do
             end;
 
             ModeButtons[Mode] = ModeButton;
-        end;
-
-        function KeyPicker:Update()
-            if Info.NoUI then
-                return;
-            end;
-
-            local State = KeyPicker:GetState();
-
-            local displayKey = (KeyPicker.Value == 'None') and '...' or KeyPicker.Value
-            ContainerLabel.Text = string.format('[%s] %s (%s)', displayKey, Info.Text or 'Keybind', KeyPicker.Mode or 'Toggle');
-            local kbMode = Library.KeybindMode or 'All'
-            if kbMode == 'Active' then
-                KeybindEntry.Visible = State == true
-            elseif kbMode == 'Toggled' then
-                local parentOn = false
-                if ParentObj and ParentObj.Type == 'Toggle' then
-                    parentOn = ParentObj.Value == true
-                elseif KeyPicker.SyncToggleState and ParentObj then
-                    parentOn = ParentObj.Value == true
-                else
-                    parentOn = true
-                end
-                KeybindEntry.Visible = parentOn
-            else
-                KeybindEntry.Visible = true
-            end
-
-            ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
-            Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
-
-            local YSize = 0
-            local XSize = 0
-
-            for _, Frame in next, Library.KeybindContainer:GetChildren() do
-                if Frame:IsA('Frame') and Frame.Visible then
-                    YSize = YSize + 18;
-                    local LabelChild = Frame:FindFirstChildOfClass('TextLabel')
-                    if LabelChild and (LabelChild.TextBounds.X + 20 > XSize) then
-                        XSize = LabelChild.TextBounds.X + 20 
-                    end
-                end;
-            end;
-
-            Library.KeybindFrame.Size = UDim2.new(0, math.max(XSize + 10 + 15, 210), 0, YSize + 23)
-        end;
-        function KeyPicker:GetState()
-            if KeyPicker.Mode == 'Always' then
-                return true;
-            elseif KeyPicker.Mode == 'Hold' then
-                if KeyPicker.Value == 'None' then
-                    return false;
-                end;
-
-                local Key = KeyPicker.Value;
-                if Key == 'MB1' or Key == 'MB2' or Key == 'Touch' then
-                    return (Key == 'MB1' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1))
-                        or (Key == 'MB2' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
-                        or (Key == 'Touch' and KeyPicker.Toggled);
-                else
-                    local success, isDown = pcall(function()
-                        return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]);
-                    end);
-                    return (success and isDown) or KeyPicker.Toggled or false;
-                end;
-            else
-                return KeyPicker.Toggled;
-            end;
         end;
 
         function KeyPicker:SetValue(Data)
