@@ -1343,10 +1343,8 @@ do
 
             SyncToggleState = Info.SyncToggleState or false;
         };
-        if KeyPicker.SyncToggleState then
-            Info.Modes = { 'Toggle' }
-            Info.Mode = 'Toggle'
-        end
+
+        local Modes = Info.Modes or { 'Always', 'Hold', 'Toggle' };
 
         local PickOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
@@ -1388,7 +1386,7 @@ do
         local ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
-            Size = UDim2.new(0, 60, 0, 45 + 2);
+            Size = UDim2.new(0, 60, 0, #Modes * 15 + 2);
             Visible = false;
             ZIndex = 14;
             Parent = ScreenGui;
@@ -1430,7 +1428,6 @@ do
             Parent = KeybindEntry,
         }, true)
 
-        local Modes = Info.Modes or { 'Always', 'Toggle', 'Hold' };
         local ModeButtons = {};
 
         for Idx, Mode in next, Modes do
@@ -1454,6 +1451,17 @@ do
                 Library.RegistryMap[Label].Properties.TextColor3 = 'AccentColor';
 
                 ModeSelectOuter.Visible = false;
+                Library.OpenedFrames[ModeSelectOuter] = nil;
+
+                if KeyPicker.SyncToggleState and ParentObj.Type == 'Toggle' then
+                    if Mode == 'Always' then
+                        ParentObj:SetValue(true);
+                    elseif Mode == 'Hold' then
+                        ParentObj:SetValue(KeyPicker:GetState());
+                    end;
+                end;
+
+                KeyPicker:Update();
             end;
             function ModeButton:Deselect()
                 KeyPicker.Mode = nil;
@@ -1482,7 +1490,7 @@ do
             local State = KeyPicker:GetState();
 
             local displayKey = (KeyPicker.Value == 'None') and '...' or KeyPicker.Value
-            ContainerLabel.Text = string.format('[%s] %s (%s)', displayKey, Info.Text, KeyPicker.Mode);
+            ContainerLabel.Text = string.format('[%s] %s (%s)', displayKey, Info.Text or 'Keybind', KeyPicker.Mode or 'Toggle');
             local kbMode = Library.KeybindMode or 'All'
             if kbMode == 'Active' then
                 KeybindEntry.Visible = State == true
@@ -1524,15 +1532,18 @@ do
             elseif KeyPicker.Mode == 'Hold' then
                 if KeyPicker.Value == 'None' then
                     return false;
-                end
+                end;
 
                 local Key = KeyPicker.Value;
                 if Key == 'MB1' or Key == 'MB2' or Key == 'Touch' then
-                    return Key == 'MB1' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-                        or Key == 'MB2' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-                        or Key == 'Touch' and true
+                    return (Key == 'MB1' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1))
+                        or (Key == 'MB2' and InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
+                        or (Key == 'Touch' and KeyPicker.Toggled);
                 else
-                    return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]);
+                    local success, isDown = pcall(function()
+                        return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]);
+                    end);
+                    return (success and isDown) or KeyPicker.Toggled or false;
                 end;
             else
                 return KeyPicker.Toggled;
@@ -1543,7 +1554,11 @@ do
             local Key, Mode = Data[1], Data[2];
             DisplayLabel.Text = Key;
             KeyPicker.Value = Key;
-            ModeButtons[Mode]:Select();
+            if Mode and ModeButtons[Mode] then
+                ModeButtons[Mode]:Select();
+            elseif ModeButtons[KeyPicker.Mode] then
+                ModeButtons[KeyPicker.Mode]:Select();
+            end;
             KeyPicker:Update();
         end;
 
@@ -1569,6 +1584,19 @@ do
             Library:SafeCallback(KeyPicker.Callback, KeyPicker.Toggled)
             Library:SafeCallback(KeyPicker.Clicked, KeyPicker.Toggled)
         end
+
+        local function MatchesInput(Input)
+            if KeyPicker.Value == 'None' then return false; end;
+            local Key = KeyPicker.Value;
+            if Key == 'MB1' or Key == 'MB2' or Key == 'Touch' then
+                return (Key == 'MB1' and Input.UserInputType == Enum.UserInputType.MouseButton1)
+                    or (Key == 'MB2' and Input.UserInputType == Enum.UserInputType.MouseButton2)
+                    or (Key == 'Touch' and Input.UserInputType == Enum.UserInputType.Touch);
+            elseif Input.UserInputType == Enum.UserInputType.Keyboard then
+                return Input.KeyCode.Name == Key;
+            end;
+            return false;
+        end;
 
         local Picking = false;
         PickOuter.InputBegan:Connect(function(Input)
@@ -1621,47 +1649,64 @@ do
                     Event:Disconnect();
                 end);
             elseif Input.UserInputType == Enum.UserInputType.MouseButton2 and not Library:MouseIsOverOpenedFrame() then
+                for Frame, _ in next, Library.OpenedFrames do
+                    if Frame:IsA('Frame') and Frame.Visible then
+                        Frame.Visible = false;
+                        Library.OpenedFrames[Frame] = nil;
+                    end;
+                end;
+                ModeSelectOuter.Position = UDim2.fromOffset(PickOuter.AbsolutePosition.X + PickOuter.AbsoluteSize.X + 4, PickOuter.AbsolutePosition.Y);
                 ModeSelectOuter.Visible = true;
+                Library.OpenedFrames[ModeSelectOuter] = true;
             end;
         end);
 
         Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
             if (not Picking) then
-                if KeyPicker.Mode == 'Toggle' then
-                    local Key = KeyPicker.Value;
-
-                    if Key == 'MB1' or Key == 'MB2' or Key == 'Touch' then
-                        if Key == 'MB1' and Input.UserInputType == Enum.UserInputType.MouseButton1
-                        or Key == 'MB2' and Input.UserInputType == Enum.UserInputType.MouseButton2 
-                        or Key == 'Touch' and Input.UserInputType == Enum.UserInputType.Touch then
-                            KeyPicker.Toggled = not KeyPicker.Toggled
-                            KeyPicker:DoClick()
+                if MatchesInput(Input) then
+                    if KeyPicker.Mode == 'Toggle' then
+                        KeyPicker.Toggled = not KeyPicker.Toggled;
+                        KeyPicker:DoClick();
+                    elseif KeyPicker.Mode == 'Hold' then
+                        KeyPicker.Toggled = true;
+                        if ParentObj.Type == 'Toggle' and KeyPicker.SyncToggleState then
+                            ParentObj:SetValue(true);
                         end;
-                    elseif Input.UserInputType == Enum.UserInputType.Keyboard then
-                        if Input.KeyCode.Name == Key then
-                            KeyPicker.Toggled = not KeyPicker.Toggled;
-                            KeyPicker:DoClick()
-                        end;
+                        Library:SafeCallback(KeyPicker.Callback, true);
+                        Library:SafeCallback(KeyPicker.Clicked, true);
                     end;
                 end;
 
                 KeyPicker:Update();
             end;
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                local AbsPos, AbsSize = ModeSelectOuter.AbsolutePosition, ModeSelectOuter.AbsoluteSize;
-                if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                    or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
-
+                if ModeSelectOuter.Visible and not Library:IsMouseOverFrame(ModeSelectOuter) then
                     ModeSelectOuter.Visible = false;
+                    Library.OpenedFrames[ModeSelectOuter] = nil;
                 end;
             end;
-        end))
+        end));
 
         Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
             if (not Picking) then
+                if MatchesInput(Input) then
+                    if KeyPicker.Mode == 'Hold' then
+                        KeyPicker.Toggled = false;
+                        if ParentObj.Type == 'Toggle' and KeyPicker.SyncToggleState then
+                            ParentObj:SetValue(false);
+                        end;
+                        Library:SafeCallback(KeyPicker.Callback, false);
+                        Library:SafeCallback(KeyPicker.Clicked, false);
+                    end;
+                end;
+
                 KeyPicker:Update();
             end;
-        end))
+        end));
+
+        if KeyPicker.SyncToggleState and KeyPicker.Mode == 'Always' and ParentObj.Type == 'Toggle' then
+            ParentObj:SetValue(true);
+        end;
 
         KeyPicker:Update();
         Options[Idx] = KeyPicker;
