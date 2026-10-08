@@ -136,6 +136,7 @@ function Library:SetFont(NewFont)
         targetFontFace = NewFont
     elseif typeof(NewFont) == 'EnumItem' then
         targetFontEnum = NewFont
+        pcall(function() targetFontFace = Font.fromEnum(NewFont) end)
     elseif typeof(NewFont) == 'string' then
         if NewFont:lower() == 'rubik' then
             pcall(function() targetFontFace = Font.fromName("Rubik") end)
@@ -145,6 +146,7 @@ function Library:SetFont(NewFont)
             targetFontEnum = Enum.Font.Ubuntu
         elseif Enum.Font[NewFont] then
             targetFontEnum = Enum.Font[NewFont]
+            pcall(function() targetFontFace = Font.fromEnum(Enum.Font[NewFont]) end)
         else
             pcall(function() targetFontFace = Font.fromName(NewFont) end)
             if not targetFontFace then
@@ -152,6 +154,7 @@ function Library:SetFont(NewFont)
             end
             if not targetFontFace and Enum.Font[NewFont] then
                 targetFontEnum = Enum.Font[NewFont]
+                pcall(function() targetFontFace = Font.fromEnum(Enum.Font[NewFont]) end)
             end
         end
     end
@@ -165,7 +168,8 @@ function Library:SetFont(NewFont)
         if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
             if targetFontFace then
                 pcall(function() descendant.FontFace = targetFontFace end)
-            elseif targetFontEnum then
+            end
+            if targetFontEnum then
                 pcall(function() descendant.Font = targetFontEnum end)
             end
         end
@@ -176,7 +180,8 @@ function Library:SetFont(NewFont)
             if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
                 if targetFontFace then
                     pcall(function() descendant.FontFace = targetFontFace end)
-                elseif targetFontEnum then
+                end
+                if targetFontEnum then
                     pcall(function() descendant.Font = targetFontEnum end)
                 end
             end
