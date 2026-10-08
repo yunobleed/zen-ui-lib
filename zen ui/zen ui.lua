@@ -23,6 +23,16 @@ local Options = {};
 getgenv().Toggles = Toggles;
 getgenv().Options = Options;
 
+local RubikFont = nil
+pcall(function()
+    RubikFont = Font.fromName("Rubik")
+end)
+if not RubikFont then
+    pcall(function()
+        RubikFont = Font.new("rbxasset://fonts/families/Rubik.json")
+    end)
+end
+
 local Library = {
     Registry = {};
     RegistryMap = {};
@@ -38,7 +48,8 @@ local Library = {
 
     Black = Color3.new(0, 0, 0);
 
-    Font = Enum.Font.Rubik,
+    Font = Enum.Font.Ubuntu,
+    FontFace = RubikFont,
     FontSize = 14,
 
     OpenedFrames = {};
@@ -53,6 +64,7 @@ local Library = {
     BlurSize = 15;
     ShowCustomCursor = true;
     UseBackgroundGradient = true;
+    ToggleKeybind = 'RightShift';
 
     KeybindMode = 'All';
 
@@ -114,26 +126,56 @@ function Library:SetFontSize(Size)
 end
 
 function Library:SetFont(NewFont)
-    if typeof(NewFont) == 'string' then
-        if Enum.Font[NewFont] then
-            NewFont = Enum.Font[NewFont]
+    local targetFontFace = nil
+    local targetFontEnum = nil
+
+    if typeof(NewFont) == 'Font' then
+        targetFontFace = NewFont
+    elseif typeof(NewFont) == 'EnumItem' then
+        targetFontEnum = NewFont
+    elseif typeof(NewFont) == 'string' then
+        if NewFont:lower() == 'rubik' then
+            pcall(function() targetFontFace = Font.fromName("Rubik") end)
+            if not targetFontFace then
+                pcall(function() targetFontFace = Font.new("rbxasset://fonts/families/Rubik.json") end)
+            end
+            targetFontEnum = Enum.Font.Ubuntu
+        elseif Enum.Font[NewFont] then
+            targetFontEnum = Enum.Font[NewFont]
+        else
+            pcall(function() targetFontFace = Font.fromName(NewFont) end)
+            if not targetFontFace then
+                pcall(function() targetFontFace = Font.new("rbxasset://fonts/families/" .. NewFont .. ".json") end)
+            end
+            if not targetFontFace and Enum.Font[NewFont] then
+                targetFontEnum = Enum.Font[NewFont]
+            end
         end
     end
-    Library.Font = NewFont
+
+    if targetFontEnum then
+        Library.Font = targetFontEnum
+    end
+    Library.FontFace = targetFontFace
+
     for _, descendant in pairs(ScreenGui:GetDescendants()) do
         if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
-            pcall(function()
-                descendant.Font = NewFont
-            end)
+            if targetFontFace then
+                pcall(function() descendant.FontFace = targetFontFace end)
+            elseif targetFontEnum then
+                pcall(function() descendant.Font = targetFontEnum end)
+            end
         end
     end
     local mobileUI = CoreGui:FindFirstChild("LinoriaMobileUI")
     if mobileUI then
         for _, descendant in pairs(mobileUI:GetDescendants()) do
             if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
-                pcall(function()
-                    descendant.Font = NewFont
-                end)
+                if targetFontFace then
+                    pcall(function() descendant.FontFace = targetFontFace end)
+                elseif targetFontEnum then
+                    pcall(function() descendant.Font = targetFontEnum end)
+                end
             end
         end
     end
@@ -216,6 +258,11 @@ function Library:Create(Class, Properties)
             _Instance:SetAttribute("FontSizeOffset", Properties.TextSize - Library.FontSize)
         else
             _Instance:SetAttribute("FontSizeOffset", 0)
+        end
+        if Library.FontFace then
+            pcall(function()
+                _Instance.FontFace = Library.FontFace
+            end)
         end
     end
 
@@ -4494,7 +4541,11 @@ function Library:CreateWindow(...)
             if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind then
                 task.spawn(Library.Toggle)
             end
-        elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
+        elseif typeof(Library.ToggleKeybind) == 'EnumItem' then
+            if Input.KeyCode == Library.ToggleKeybind then
+                task.spawn(Library.Toggle)
+            end
+        elseif Input.KeyCode == Enum.KeyCode.RightShift then
             task.spawn(Library.Toggle)
         end
     end))
