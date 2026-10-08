@@ -627,21 +627,27 @@ function Library:GiveSignal(Signal)
 end
 
 function Library:Unload()
+    Library.Unloaded = true;
+
     for Idx = #Library.Signals, 1, -1 do
-        local Connection = table.remove(Library.Signals, Idx)
-        Connection:Disconnect()
-    end
+        local Connection = table.remove(Library.Signals, Idx);
+        Connection:Disconnect();
+    end;
 
     if Library.OnUnload then
-        Library.OnUnload()
-    end
+        Library.OnUnload();
+    end;
     
     if Library.BlurEffect then
-        Library.BlurEffect:Destroy()
-    end
+        Library.BlurEffect:Destroy();
+    end;
 
-    ScreenGui:Destroy()
-end
+    pcall(function()
+        InputService.MouseIconEnabled = true;
+    end);
+
+    ScreenGui:Destroy();
+end;
 
 function Library:OnUnload(Callback)
     Library.OnUnload = Callback
