@@ -38,7 +38,7 @@ local Library = {
 
     Black = Color3.new(0, 0, 0);
 
-    Font = Enum.Font.Code,
+    Font = Enum.Font.Rubik,
     FontSize = 14,
 
     OpenedFrames = {};
@@ -51,6 +51,8 @@ local Library = {
     WireframeDrag = true;
     UseBlur = false;
     BlurSize = 15;
+    ShowCustomCursor = true;
+    UseBackgroundGradient = true;
 
     KeybindMode = 'All';
 
@@ -106,6 +108,32 @@ function Library:SetFontSize(Size)
                 if offset then
                     descendant.TextSize = Size + offset
                 end
+            end
+        end
+    end
+end
+
+function Library:SetFont(NewFont)
+    if typeof(NewFont) == 'string' then
+        if Enum.Font[NewFont] then
+            NewFont = Enum.Font[NewFont]
+        end
+    end
+    Library.Font = NewFont
+    for _, descendant in pairs(ScreenGui:GetDescendants()) do
+        if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
+            pcall(function()
+                descendant.Font = NewFont
+            end)
+        end
+    end
+    local mobileUI = CoreGui:FindFirstChild("LinoriaMobileUI")
+    if mobileUI then
+        for _, descendant in pairs(mobileUI:GetDescendants()) do
+            if descendant:IsA("TextLabel") or descendant:IsA("TextBox") or descendant:IsA("TextButton") then
+                pcall(function()
+                    descendant.Font = NewFont
+                end)
             end
         end
     end
@@ -3391,7 +3419,7 @@ function Library:CreateWindow(...)
     if type(Config.TabPadding) ~= 'number' then Config.TabPadding = 0 end
     if type(Config.MenuFadeTime) ~= 'number' then Config.MenuFadeTime = 0.2 end
 
-    if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(550, 650) end
+    if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(615, 680) end
     if typeof(Config.Position) ~= 'UDim2' then Config.Position = UDim2.fromOffset(175, 50) end
 
     if InputService.TouchEnabled then
@@ -3441,6 +3469,24 @@ function Library:CreateWindow(...)
     Library:AddToRegistry(Inner, {
         BackgroundColor3 = 'MainColor';
         BorderColor3 = 'OutlineColor';
+    });
+
+    local InnerGradient = Library:Create('UIGradient', {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.15)),
+            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.72)),
+        }),
+        Rotation = 90,
+        Enabled = Config.BackgroundGradient ~= false and Library.UseBackgroundGradient ~= false,
+        Parent = Inner,
+    });
+    Library:AddToRegistry(InnerGradient, {
+        Color = function()
+            return ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.15)),
+                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.72)),
+            });
+        end
     });
 
     local TopAccentLine = Library:Create('Frame', {
@@ -3509,7 +3555,7 @@ function Library:CreateWindow(...)
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
         Position = UDim2.new(0, 8, 0, 25);
-        Size = UDim2.new(1, -16, 0, 29);
+        Size = UDim2.new(1, -16, 0, 31);
         ZIndex = 1;
         Parent = Inner;
     });
@@ -3525,43 +3571,78 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = TabBarOuter;
     });
+
+    local function GetTabBarColorSequence()
+        local H, S, V = Color3.toHSV(Library.AccentColor);
+        local SubtleSheen = Color3.fromHSV(H, S * 0.22, 0.24);
+        return ColorSequence.new({
+            ColorSequenceKeypoint.new(0, SubtleSheen),
+            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.BackgroundColor, 0.72)),
+        });
+    end;
+
     local TabBarGradient = Library:Create('UIGradient', {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.BackgroundColor, 1.25)),
-            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.BackgroundColor, 0.85)),
-        }),
+        Color = GetTabBarColorSequence(),
         Rotation = 90,
         Parent = TabBarInner,
     });
-    Library:AddToRegistry(TabBarInner, {
-        BackgroundColor3 = 'BackgroundColor';
-    });
     Library:AddToRegistry(TabBarGradient, {
+        Color = GetTabBarColorSequence
+    });
+
+    local TabBarAccentLine = Library:Create('Frame', {
+        Name = 'TabBarAccentLine',
+        BackgroundColor3 = Library.AccentColor,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 0, 1, -1),
+        Size = UDim2.new(1, 0, 0, 1),
+        ZIndex = 3,
+        Parent = TabBarInner,
+    });
+    local TabBarAccentLineGradient = Library:Create('UIGradient', {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor, 0.3)),
+            ColorSequenceKeypoint.new(0.5, Library.AccentColor),
+            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor, 0.3)),
+        }),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.85),
+            NumberSequenceKeypoint.new(0.5, 0.2),
+            NumberSequenceKeypoint.new(1, 0.85),
+        }),
+        Parent = TabBarAccentLine,
+    });
+    Library:AddToRegistry(TabBarAccentLine, { BackgroundColor3 = 'AccentColor' });
+    Library:AddToRegistry(TabBarAccentLineGradient, {
         Color = function()
             return ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.BackgroundColor, 1.25)),
-                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.BackgroundColor, 0.85)),
+                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor, 0.3)),
+                ColorSequenceKeypoint.new(0.5, Library.AccentColor),
+                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor, 0.3)),
             });
         end
     });
+
     local TabArea = Library:Create('Frame', {
         BackgroundTransparency = 1;
-        Position = UDim2.new(0, 4, 0, 4);
-        Size = UDim2.new(1, -8, 1, -8);
+        Position = UDim2.new(0, 4, 0, 3);
+        Size = UDim2.new(1, -8, 1, -6);
         ZIndex = 1;
         Parent = TabBarInner;
     });
     local TabListLayout = Library:Create('UIListLayout', {
-        Padding = UDim.new(0, Config.TabPadding);
+        Padding = UDim.new(0, Config.TabPadding or 6);
         FillDirection = Enum.FillDirection.Horizontal;
+        HorizontalAlignment = Enum.HorizontalAlignment.Center;
+        VerticalAlignment = Enum.VerticalAlignment.Center;
         SortOrder = Enum.SortOrder.LayoutOrder;
         Parent = TabArea;
     });
     local MainSectionOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
-        Position = UDim2.new(0, 8, 0, 58);
-        Size = UDim2.new(1, -16, 1, -66);
+        Position = UDim2.new(0, 8, 0, 60);
+        Size = UDim2.new(1, -16, 1, -68);
         ZIndex = 1;
         Parent = Inner;
     });
@@ -3581,6 +3662,49 @@ function Library:CreateWindow(...)
     Library:AddToRegistry(MainSectionInner, {
         BackgroundColor3 = 'BackgroundColor';
     });
+    local MainSectionGradient = Library:Create('UIGradient', {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.BackgroundColor, 1.1)),
+            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.BackgroundColor, 0.75)),
+        }),
+        Rotation = 90,
+        Enabled = Config.BackgroundGradient ~= false and Library.UseBackgroundGradient ~= false,
+        Parent = MainSectionInner,
+    });
+    Library:AddToRegistry(MainSectionGradient, {
+        Color = function()
+            return ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.BackgroundColor, 1.1)),
+                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.BackgroundColor, 0.75)),
+            });
+        end
+    });
+
+    function Window:SetBackgroundGradient(Enabled, Color1, Color2, Rotation)
+        if typeof(Enabled) == 'boolean' then
+            InnerGradient.Enabled = Enabled
+            MainSectionGradient.Enabled = Enabled
+        end
+        if Color1 and Color2 then
+            local seq = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color1),
+                ColorSequenceKeypoint.new(1, Color2),
+            })
+            InnerGradient.Color = seq
+            MainSectionGradient.Color = seq
+        end
+        if Rotation then
+            InnerGradient.Rotation = Rotation
+            MainSectionGradient.Rotation = Rotation
+        end
+    end;
+
+    function Library:SetBackgroundGradient(Enabled, Color1, Color2, Rotation)
+        if typeof(Enabled) == 'boolean' then
+            Library.UseBackgroundGradient = Enabled
+        end
+        Window:SetBackgroundGradient(Enabled, Color1, Color2, Rotation)
+    end;
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.OutlineColor;
@@ -3625,36 +3749,42 @@ function Library:CreateWindow(...)
         local TabButton = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
             BorderColor3 = Library.OutlineColor;
-            Size = UDim2.new(0, TabButtonWidth + 18, 1, 0);
+            Size = UDim2.new(0, TabButtonWidth + 24, 1, 0);
             ZIndex = 1;
             Parent = TabArea;
         });
         Library:AddToRegistry(TabButton, {
-            BackgroundColor3 = 'BackgroundColor';
-            BorderColor3 = 'OutlineColor';
+            BackgroundColor3 = function()
+                return Window.ActiveTab == Tab and Library.MainColor or Library.BackgroundColor;
+            end,
+            BorderColor3 = function()
+                return Window.ActiveTab == Tab and Library.AccentColor or Library.OutlineColor;
+            end,
         });
-        local TabButtonGradient = Library:Create('UIGradient', {
-            Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.18)),
-                ColorSequenceKeypoint.new(1, Library.MainColor),
+
+        local function GetActiveTabGradient()
+            local H, S, V = Color3.toHSV(Library.AccentColor);
+            local TopAccentTint = Color3.fromHSV(H, S * 0.35, 0.28);
+            return ColorSequence.new({
+                ColorSequenceKeypoint.new(0, TopAccentTint),
+                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.MainColor, 0.85)),
             });
+        end;
+
+        local TabButtonGradient = Library:Create('UIGradient', {
+            Color = GetActiveTabGradient(),
             Rotation = 90;
             Enabled = false;
             Parent = TabButton;
         });
         Library:AddToRegistry(TabButtonGradient, {
-            Color = function()
-                return ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Library:GetLighterColor(Library.MainColor, 1.18)),
-                    ColorSequenceKeypoint.new(1, Library.MainColor),
-                });
-            end
+            Color = GetActiveTabGradient
         });
         local TabButtonLabel = Library:CreateLabel({
             Position = UDim2.new(0, 0, 0, 0);
             Size = UDim2.new(1, 0, 1, -1);
             Text = Name;
-            TextColor3 = Color3.fromRGB(155, 160, 170);
+            TextColor3 = Color3.fromRGB(150, 155, 165);
             ZIndex = 2;
             Parent = TabButton;
         });
@@ -3664,7 +3794,7 @@ function Library:CreateWindow(...)
                 if Window.ActiveTab == Tab then
                     return Library.FontColor;
                 else
-                    return Color3.fromRGB(155, 160, 170);
+                    return Color3.fromRGB(150, 155, 165);
                 end;
             end
         });
@@ -3680,19 +3810,19 @@ function Library:CreateWindow(...)
         });
         local TabIndicatorGradient = Library:Create('UIGradient', {
             Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor, 0.7)),
-                ColorSequenceKeypoint.new(0.5, Library:GetLighterColor(Library.AccentColor, 1.3)),
-                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor, 0.7)),
-            });
+                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor, 0.4)),
+                ColorSequenceKeypoint.new(0.5, Library:GetLighterColor(Library.AccentColor, 1.35)),
+                ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor, 0.4)),
+            }),
             Parent = TabIndicator;
         });
         Library:AddToRegistry(TabIndicator, { BackgroundColor3 = 'AccentColor' });
         Library:AddToRegistry(TabIndicatorGradient, {
             Color = function()
                 return ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor, 0.7)),
-                    ColorSequenceKeypoint.new(0.5, Library:GetLighterColor(Library.AccentColor, 1.3)),
-                    ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor, 0.7)),
+                    ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor, 0.4)),
+                    ColorSequenceKeypoint.new(0.5, Library:GetLighterColor(Library.AccentColor, 1.35)),
+                    ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor, 0.4)),
                 });
             end
         });
@@ -3700,20 +3830,22 @@ function Library:CreateWindow(...)
         TabButton.MouseEnter:Connect(function()
             if Window.ActiveTab == Tab then return end
             Library:Tween(TabButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundColor3 = Library:GetLighterColor(Library.BackgroundColor, 1.25)
+                BackgroundColor3 = Library:GetLighterColor(Library.BackgroundColor, 1.25),
+                BorderColor3 = Library:GetLighterColor(Library.OutlineColor, 1.3),
             });
             Library:Tween(TabButtonLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                TextColor3 = Color3.fromRGB(225, 230, 240)
+                TextColor3 = Color3.fromRGB(235, 240, 250)
             });
         end);
 
         TabButton.MouseLeave:Connect(function()
             if Window.ActiveTab == Tab then return end
             Library:Tween(TabButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundColor3 = Library.BackgroundColor
+                BackgroundColor3 = Library.BackgroundColor,
+                BorderColor3 = Library.OutlineColor,
             });
             Library:Tween(TabButtonLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                TextColor3 = Color3.fromRGB(155, 160, 170)
+                TextColor3 = Color3.fromRGB(150, 155, 165)
             });
         end);
 
@@ -3786,7 +3918,8 @@ function Library:CreateWindow(...)
             TabButtonGradient.Enabled = true;
 
             Library:Tween(TabButton, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundColor3 = Library.MainColor
+                BackgroundColor3 = Library.MainColor,
+                BorderColor3 = Library.AccentColor,
             });
             Library:Tween(TabButtonLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 TextColor3 = Library.FontColor
@@ -3794,8 +3927,8 @@ function Library:CreateWindow(...)
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'MainColor';
 
             TabIndicator.Visible = true;
-            Library:Tween(TabIndicator, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Size = UDim2.new(1, 0, 0, 2),
+            Library:Tween(TabIndicator, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                Size = UDim2.new(1, -4, 0, 2),
                 BackgroundTransparency = 0
             });
 
@@ -3810,10 +3943,11 @@ function Library:CreateWindow(...)
             TabButtonGradient.Enabled = false;
 
             Library:Tween(TabButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                BackgroundColor3 = Library.BackgroundColor
+                BackgroundColor3 = Library.BackgroundColor,
+                BorderColor3 = Library.OutlineColor,
             });
             Library:Tween(TabButtonLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                TextColor3 = Color3.fromRGB(155, 160, 170)
+                TextColor3 = Color3.fromRGB(150, 155, 165)
             });
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'BackgroundColor';
 
@@ -4255,42 +4389,77 @@ function Library:CreateWindow(...)
             end);
         end;
 
-        if Library.Toggled then
+        local ShowCursor = (Config.ShowCustomCursor ~= false) and (Library.ShowCustomCursor ~= false);
+        if Library.Toggled and ShowCursor then
             task.spawn(function()
                 local State = InputService.MouseIconEnabled;
 
-                local Cursor = Drawing.new('Triangle');
-                Cursor.Thickness = 1;
-                Cursor.Filled = true;
-                Cursor.Visible = true;
+                local Cursor, CursorOutline;
+                local HasDrawing = pcall(function()
+                    Cursor = Drawing.new('Triangle');
+                    Cursor.Thickness = 1;
+                    Cursor.Filled = true;
+                    Cursor.Visible = true;
+                    Cursor.ZIndex = 999999;
 
-                local CursorOutline = Drawing.new('Triangle');
-                CursorOutline.Thickness = 1;
-                CursorOutline.Filled = false;
-                CursorOutline.Color = Color3.new(0, 0, 0);
-                CursorOutline.Visible = true;
+                    CursorOutline = Drawing.new('Triangle');
+                    CursorOutline.Thickness = 1;
+                    CursorOutline.Filled = false;
+                    CursorOutline.Color = Color3.new(0, 0, 0);
+                    CursorOutline.Visible = true;
+                    CursorOutline.ZIndex = 1000000;
+                end);
+
+                local GuiCursor;
+                if not HasDrawing or not Cursor then
+                    GuiCursor = ScreenGui:FindFirstChild("LinoriaCustomCursor");
+                    if not GuiCursor then
+                        GuiCursor = Library:Create('ImageLabel', {
+                            Name = "LinoriaCustomCursor",
+                            BackgroundTransparency = 1,
+                            Size = UDim2.fromOffset(24, 24),
+                            Image = "rbxassetid://10639918520",
+                            ImageColor3 = Library.AccentColor,
+                            ZIndex = 1000000,
+                            Visible = false,
+                            Parent = ScreenGui,
+                        });
+                    end;
+                    GuiCursor.Visible = true;
+                end;
 
                 while Library.Toggled and ScreenGui.Parent do
                     InputService.MouseIconEnabled = false;
 
                     local mPos = InputService:GetMouseLocation();
 
-                    Cursor.Color = Library.AccentColor;
-
-                    Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
-                    Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
-                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
-                    CursorOutline.PointA = Cursor.PointA;
-                    CursorOutline.PointB = Cursor.PointB;
-                    CursorOutline.PointC = Cursor.PointC;
+                    if HasDrawing and Cursor and CursorOutline then
+                        Cursor.Color = Library.AccentColor;
+                        Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
+                        Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
+                        Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
+                        CursorOutline.PointA = Cursor.PointA;
+                        CursorOutline.PointB = Cursor.PointB;
+                        CursorOutline.PointC = Cursor.PointC;
+                    elseif GuiCursor then
+                        GuiCursor.ImageColor3 = Library.AccentColor;
+                        GuiCursor.Position = UDim2.fromOffset(mPos.X, mPos.Y);
+                    end;
 
                     RenderStepped:Wait();
                 end;
 
                 InputService.MouseIconEnabled = State;
 
-                Cursor:Remove();
-                CursorOutline:Remove();
+                if HasDrawing and Cursor and CursorOutline then
+                    pcall(function()
+                        Cursor:Remove();
+                        CursorOutline:Remove();
+                    end);
+                end;
+                if GuiCursor then
+                    GuiCursor.Visible = false;
+                end;
             end);
         end;
 
